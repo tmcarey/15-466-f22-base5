@@ -137,9 +137,9 @@ void WalkMesh::walk_in_triangle(WalkPoint const &start, glm::vec3 const &step, W
 	glm::vec3 bary_velocity = end_bary - start_bary;
 
 	//TODO: check when/if this velocity pushes start.weights into an edge
-	float t = 1000000000.0f;
+	float t = std::numeric_limits<float>::max();
 	if(bary_velocity == glm::vec3(0)){
-		time = 1.0f;
+		time = 0.0f;
 		end = start;
 	}
 
@@ -165,8 +165,46 @@ void WalkMesh::walk_in_triangle(WalkPoint const &start, glm::vec3 const &step, W
 		t = std::min(t, tx);
 	}
 
-	time = 1.0f;
-	end = WalkPoint(start.indices, start.weights + bary_velocity * t);
+	if(t >= 1.0f){
+		time = 1.0f;
+		end = WalkPoint(start.indices, start.weights + bary_velocity);
+	}else{
+		glm::vec3 edge_bary = barycentric_weights(vertices[start.indices.x],vertices[start.indices.y],vertices[start.indices.z], position + t * step);
+		for(int i = 0;i < 3;i ++){
+			if(std::abs(edge_bary[i]) < 0.000001f){
+				edge_bary[i] = 0.f;
+			}
+		}
+		glm::uvec3 indices = start.indices;
+		glm::vec3 weights = edge_bary;
+		if(weights.z != 0.f){
+			printf("z is not zero\n");
+			printf("%s\n", glm::to_string(weights).c_str());
+			printf("%f\n", weights.x);
+			if(weights.x == 0.f){
+				printf("x is zero\n");
+				int tempIndex = indices.z;
+				indices.z = indices.x;
+				indices.x = tempIndex;
+
+				weights.x = weights.z;
+				weights.z = 0.f;
+			}
+			else if(weights.y == 0.f){
+				printf("x is zero\n");
+				int tempIndex = indices.z;
+				indices.z = indices.y;
+				indices.y = tempIndex;
+
+				weights.y = weights.z;
+				weights.z = 0.f;
+			}else{
+				printf("nothing found?\n");
+			}
+		}
+		end = WalkPoint(indices, weights);
+		time = t;
+	}
 
 	//if no edge is crossed, event will just be taking the whole step:
 
