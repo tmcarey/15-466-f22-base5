@@ -42,8 +42,16 @@ WalkMesh::WalkMesh(std::vector< glm::vec3 > const &vertices_, std::vector< glm::
 
 //project pt to the plane of triangle a,b,c and return the barycentric weights of the projected point:
 glm::vec3 barycentric_weights(glm::vec3 const &a, glm::vec3 const &b, glm::vec3 const &c, glm::vec3 const &pt) {
-	//TODO: implement!
-	return glm::vec3(0.25f, 0.25f, 0.5f);
+	glm::vec3 u = b - a;
+	glm::vec3 v = c - a;
+	glm::vec3 n = glm::cross(u, v);
+	float n2 = glm::dot(n,n);
+	
+	glm::vec3 tp = pt - a;
+	float ba = glm::dot(glm::cross(u,tp), n) / n2;
+	float bb = glm::dot(glm::cross(tp,v), n) / n2;
+	float bc = 1 - bb - ba;
+	return glm::vec3(bc,bb,ba);
 }
 
 WalkPoint WalkMesh::nearest_walk_point(glm::vec3 const &world_point) const {
@@ -120,15 +128,47 @@ void WalkMesh::walk_in_triangle(WalkPoint const &start, glm::vec3 const &step, W
 	assert(time_);
 	auto &time = *time_;
 
-	glm::vec3 step_coords;
-	{ //project 'step' into a barycentric-coordinates direction:
-		//TODO
-		step_coords = glm::vec3(0.0f);
+	glm::vec3 position = to_world_point(start);
+	glm::vec3 end_position = position + step;
+
+	glm::vec3 start_bary = start.weights;
+	glm::vec3 end_bary = barycentric_weights(vertices[start.indices.x],vertices[start.indices.y],vertices[start.indices.z], end_position);
+
+	glm::vec3 bary_velocity = end_bary - start_bary;
+
+	//TODO: check when/if this velocity pushes start.weights into an edge
+	float t = 1000000000.0f;
+	if(bary_velocity == glm::vec3(0)){
+		time = 1.0f;
+		end = start;
 	}
-	
-	//if no edge is crossed, event will just be taking the whole step:
+
+	if (bary_velocity.x > 0){
+		float tx = (1.0f - start_bary.x) / bary_velocity.x;
+		t = std::min(t, tx);
+	}else if(bary_velocity.x < 0){
+		float tx = (start_bary.x) / -bary_velocity.x;
+		t = std::min(t, tx);
+	}
+	if (bary_velocity.y > 0){
+		float tx = (1.0f - start_bary.y) / bary_velocity.y;
+		t = std::min(t, tx);
+	}else if(bary_velocity.y < 0){
+		float tx = (start_bary.y) / -bary_velocity.y;
+		t = std::min(t, tx);
+	}
+	if (bary_velocity.z > 0){
+		float tx = (1.0f - start_bary.z) / bary_velocity.z;
+		t = std::min(t, tx);
+	}else if(bary_velocity.z < 0){
+		float tx = (start_bary.z) / -bary_velocity.z;
+		t = std::min(t, tx);
+	}
+
 	time = 1.0f;
-	end = start;
+	end = WalkPoint(start.indices, start.weights + bary_velocity * t);
+
+	//if no edge is crossed, event will just be taking the whole step:
 
 	//figure out which edge (if any) is crossed first.
 	// set time and end appropriately.
