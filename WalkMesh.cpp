@@ -142,62 +142,63 @@ void WalkMesh::walk_in_triangle(WalkPoint const &start, glm::vec3 const &step, W
 	//TODO: check when/if this velocity pushes start.weights into an edge
 	float t = std::numeric_limits<float>::max();
 	if(bary_velocity == glm::vec3(0)){
-		time = 0.0f;
+		time = 1.0f;
 		end = start;
 	}
 
+	int edgeId = -1;
 	if (bary_velocity.x > 0){
 		float tx = (1.0f - start_bary.x) / bary_velocity.x;
+		if(tx < t){
+			edgeId = 0;
+		}
 		t = std::min(t, tx);
 	}else if(bary_velocity.x < 0){
 		float tx = (start_bary.x) / -bary_velocity.x;
+		if(tx < t){
+			edgeId = 0;
+		}
 		t = std::min(t, tx);
 	}
 	if (bary_velocity.y > 0){
-		float tx = (1.0f - start_bary.y) / bary_velocity.y;
-		t = std::min(t, tx);
+		float ty = (1.0f - start_bary.y) / bary_velocity.y;
+		if(ty < t){
+			edgeId = 1;
+		}
+		t = std::min(t, ty);
 	}else if(bary_velocity.y < 0){
-		float tx = (start_bary.y) / -bary_velocity.y;
-		t = std::min(t, tx);
+		float ty = (start_bary.y) / -bary_velocity.y;
+		if(ty < t){
+			edgeId = 1;
+		}
+		t = std::min(t, ty);
 	}
 	if (bary_velocity.z > 0){
-		float tx = (1.0f - start_bary.z) / bary_velocity.z;
-		t = std::min(t, tx);
+		float tz = (1.0f - start_bary.z) / bary_velocity.z;
+		if(tz < t){
+			edgeId = 2;
+		}
+		t = std::min(t, tz);
 	}else if(bary_velocity.z < 0){
-		float tx = (start_bary.z) / -bary_velocity.z;
-		t = std::min(t, tx);
+		float tz = (start_bary.z) / -bary_velocity.z;
+		if(tz < t){
+			edgeId = 2;
+		}
+		t = std::min(t, tz);
 	}
 
 	if(t >= 1.0f){
 		time = 1.0f;
 		end = WalkPoint(start.indices, start.weights + bary_velocity);
 	}else{
-		glm::vec3 edge_bary = barycentric_weights(vertices[start.indices.x],vertices[start.indices.y],vertices[start.indices.z], position + t * step);
-		for(int i = 0;i < 3;i ++){
-			if(std::abs(edge_bary[i]) < 0.001f){
-				edge_bary[i] = 0.f;
-			}
-		}
+		glm::vec3 edge_bary = start.weights + bary_velocity * t;
+
 		glm::uvec3 indices = start.indices;
 		glm::vec3 weights = edge_bary;
-		if(weights.z != 0.f){
-			if(weights.x == 0.f){
-				int tempIndex = indices.z;
-				indices.z = indices.x;
-				indices.x = tempIndex;
-
-				weights.x = weights.z;
-				weights.z = 0.f;
-			}
-			else if(weights.y == 0.f){
-				int tempIndex = indices.z;
-				indices.z = indices.y;
-				indices.y = tempIndex;
-
-				weights.y = weights.z;
-				weights.z = 0.f;
-			}
-		}
+		weights[edgeId] = weights.z;
+		weights.z = 0.0f;
+		indices[edgeId] = start.indices.z;
+		indices.z = start.indices[edgeId];
 		end = WalkPoint(indices, weights);
 		time = t;
 	}
@@ -210,7 +211,6 @@ bool WalkMesh::cross_edge(WalkPoint const &start, WalkPoint *end_, glm::quat *ro
 	assert(rotation_);
 	auto &rotation = *rotation_;
 
-	printf("%s\n", glm::to_string(start.weights).c_str());
 	assert(start.weights.z == 0.0f); //*must* be on an edge.
 	glm::uvec2 edge = glm::uvec2(start.indices);
 
@@ -237,9 +237,6 @@ bool WalkMesh::cross_edge(WalkPoint const &start, WalkPoint *end_, glm::quat *ro
 		glm::vec3 norm1 = glm::cross(glm::normalize(vecA), glm::normalize(vecB));
 		glm::vec3 norm2 = glm::cross(glm::normalize(vecB), glm::normalize(vecC));
 
-
-		//make 'rotation' the rotation that takes (start.indices)'s normal to (end.indices)'s normal:
-		//TODO
 		glm::vec3 cross = glm::cross(norm2, norm1);
 		if(glm::length(cross) > 0){
 			rotation = glm::rotate(glm::asin(glm::length(cross)), cross);

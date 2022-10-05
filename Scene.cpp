@@ -79,15 +79,15 @@ glm::mat4 Scene::Camera::make_projection() const {
 
 //-------------------------
 
-
 void Scene::draw(Camera const &camera) const {
 	assert(camera.transform);
 	glm::mat4 world_to_clip = camera.make_projection() * glm::mat4(camera.transform->make_world_to_local());
 	glm::mat4x3 world_to_light = glm::mat4x3(1.0f);
-	draw(world_to_clip, world_to_light);
+	glm::mat4 world_to_view = camera.transform->make_world_to_local();
+	draw(world_to_clip, world_to_light, world_to_view);
 }
 
-void Scene::draw(glm::mat4 const &world_to_clip, glm::mat4x3 const &world_to_light) const {
+void Scene::draw(glm::mat4 const &world_to_clip, glm::mat4x3 const &world_to_light, glm::mat4x3 const &world_to_view) const {
 
 	//Iterate through all drawables, sending each one to OpenGL:
 	for (auto const &drawable : drawables) {
@@ -113,6 +113,8 @@ void Scene::draw(glm::mat4 const &world_to_clip, glm::mat4x3 const &world_to_lig
 		//the object-to-world matrix is used in all three of these uniforms:
 		assert(drawable.transform); //drawables *must* have a transform
 		glm::mat4x3 object_to_world = drawable.transform->make_local_to_world();
+		glm::mat4x3 object_to_view = world_to_view * glm::mat4(object_to_world);
+		glUniformMatrix4x3fv(pipeline.OBJECT_TO_VIEW_mat4x3, 1, GL_FALSE,  glm::value_ptr(object_to_view));
 
 		//OBJECT_TO_CLIP takes vertices from object space to clip space:
 		if (pipeline.OBJECT_TO_CLIP_mat4 != -1U) {

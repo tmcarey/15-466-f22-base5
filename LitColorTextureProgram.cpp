@@ -3,6 +3,7 @@
 #include "gl_compile_program.hpp"
 #include "gl_errors.hpp"
 
+
 Scene::Drawable::Pipeline lit_color_texture_program_pipeline;
 
 Load< LitColorTextureProgram > lit_color_texture_program(LoadTagEarly, []() -> LitColorTextureProgram const * {
@@ -14,6 +15,7 @@ Load< LitColorTextureProgram > lit_color_texture_program(LoadTagEarly, []() -> L
 	lit_color_texture_program_pipeline.OBJECT_TO_CLIP_mat4 = ret->OBJECT_TO_CLIP_mat4;
 	lit_color_texture_program_pipeline.OBJECT_TO_LIGHT_mat4x3 = ret->OBJECT_TO_LIGHT_mat4x3;
 	lit_color_texture_program_pipeline.NORMAL_TO_LIGHT_mat3 = ret->NORMAL_TO_LIGHT_mat3;
+	lit_color_texture_program_pipeline.OBJECT_TO_VIEW_mat4x3 = ret->OBJECT_TO_VIEW_mat4x3;
 
 	/* This will be used later if/when we build a light loop into the Scene:
 	lit_color_texture_program_pipeline.LIGHT_TYPE_int = ret->LIGHT_TYPE_int;
@@ -22,6 +24,7 @@ Load< LitColorTextureProgram > lit_color_texture_program(LoadTagEarly, []() -> L
 	lit_color_texture_program_pipeline.LIGHT_ENERGY_vec3 = ret->LIGHT_ENERGY_vec3;
 	lit_color_texture_program_pipeline.LIGHT_CUTOFF_float = ret->LIGHT_CUTOFF_float;
 	*/
+
 
 	//make a 1-pixel white texture to bind by default:
 	GLuint tex;
@@ -50,17 +53,20 @@ LitColorTextureProgram::LitColorTextureProgram() {
 		"#version 330\n"
 		"uniform mat4 OBJECT_TO_CLIP;\n"
 		"uniform mat4x3 OBJECT_TO_LIGHT;\n"
+		"uniform mat4x3 OBJECT_TO_VIEW;\n"
 		"uniform mat3 NORMAL_TO_LIGHT;\n"
 		"in vec4 Position;\n"
 		"in vec3 Normal;\n"
 		"in vec4 Color;\n"
 		"in vec2 TexCoord;\n"
 		"out vec3 position;\n"
+		"out vec3 viewPosition;\n"
 		"out vec3 normal;\n"
 		"out vec4 color;\n"
 		"out vec2 texCoord;\n"
 		"void main() {\n"
 		"	gl_Position = OBJECT_TO_CLIP * Position;\n"
+		"	viewPosition =  OBJECT_TO_VIEW * Position;\n"
 		"	position = OBJECT_TO_LIGHT * Position;\n"
 		"	normal = NORMAL_TO_LIGHT * Normal;\n"
 		"	color = Color;\n"
@@ -75,7 +81,10 @@ LitColorTextureProgram::LitColorTextureProgram() {
 		"uniform vec3 LIGHT_DIRECTION;\n"
 		"uniform vec3 LIGHT_ENERGY;\n"
 		"uniform float LIGHT_CUTOFF;\n"
+		"uniform vec3 CAMERA_LOCATION;\n"
+		"uniform vec4 FOG_COLOR;\n"
 		"in vec3 position;\n"
+		"in vec3 viewPosition;\n"
 		"in vec3 normal;\n"
 		"in vec4 color;\n"
 		"in vec2 texCoord;\n"
@@ -103,7 +112,9 @@ LitColorTextureProgram::LitColorTextureProgram() {
 		"		e = max(0.0, dot(n,-LIGHT_DIRECTION)) * LIGHT_ENERGY;\n"
 		"	}\n"
 		"	vec4 albedo = texture(TEX, texCoord) * color;\n"
-		"	fragColor = vec4(e*albedo.rgb, albedo.a);\n"
+		"   vec4 nonFogColor = vec4(e*albedo.rgb, albedo.a);\n"
+		"   float distance = length(viewPosition);\n"
+		"	fragColor = mix(nonFogColor, FOG_COLOR, min(1.0, (distance * distance) / 2000.0f));\n"
 		"}\n"
 	);
 	//As you can see above, adjacent strings in C/C++ are concatenated.
@@ -126,6 +137,8 @@ LitColorTextureProgram::LitColorTextureProgram() {
 	LIGHT_ENERGY_vec3 = glGetUniformLocation(program, "LIGHT_ENERGY");
 	LIGHT_CUTOFF_float = glGetUniformLocation(program, "LIGHT_CUTOFF");
 
+	OBJECT_TO_VIEW_mat4x3 = glGetUniformLocation(program, "OBJECT_TO_VIEW");
+	FOG_COLOR_vec4 = glGetUniformLocation(program, "FOG_COLOR");
 
 	GLuint TEX_sampler2D = glGetUniformLocation(program, "TEX");
 

@@ -69,6 +69,7 @@ struct Scene {
 			GLuint OBJECT_TO_CLIP_mat4 = -1U; //uniform location for object to clip space matrix
 			GLuint OBJECT_TO_LIGHT_mat4x3 = -1U; //uniform location for object to light space (== world space) matrix
 			GLuint NORMAL_TO_LIGHT_mat3 = -1U; //uniform location for normal to light space (== world space) matrix
+			GLuint OBJECT_TO_VIEW_mat4x3 = -1U; //uniform location for object to light space (== world space) matrix
 
 			std::function< void() > set_uniforms; //(optional) function to set any other useful uniforms
 
@@ -126,7 +127,7 @@ struct Scene {
 	void draw(Camera const &camera) const;
 
 	//..sometimes, you want to draw with a custom projection matrix and/or light space:
-	void draw(glm::mat4 const &world_to_clip, glm::mat4x3 const &world_to_light = glm::mat4x3(1.0f)) const;
+	void draw(glm::mat4 const &world_to_clip, glm::mat4x3 const &world_to_light = glm::mat4x3(1.0f), glm::mat4x3 const &world_to_view = glm::mat4x3(1.0f)) const;
 
 	//add transforms/objects/cameras from a scene file to this scene:
 	// the 'on_drawable' callback gives your code a chance to look up mesh data and make Drawables:
