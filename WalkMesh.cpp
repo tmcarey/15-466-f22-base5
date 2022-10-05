@@ -1,14 +1,17 @@
 #include "WalkMesh.hpp"
 
+#include "glm/fwd.hpp"
 #include "read_write_chunk.hpp"
 
 #include <glm/gtx/norm.hpp>
 #include <glm/gtx/string_cast.hpp>
+#include <glm/gtx/transform.hpp>
 
 #include <iostream>
 #include <fstream>
 #include <algorithm>
 #include <string>
+#include <utility>
 
 WalkMesh::WalkMesh(std::vector< glm::vec3 > const &vertices_, std::vector< glm::vec3 > const &normals_, std::vector< glm::uvec3 > const &triangles_)
 	: vertices(vertices_), normals(normals_), triangles(triangles_) {
@@ -171,18 +174,14 @@ void WalkMesh::walk_in_triangle(WalkPoint const &start, glm::vec3 const &step, W
 	}else{
 		glm::vec3 edge_bary = barycentric_weights(vertices[start.indices.x],vertices[start.indices.y],vertices[start.indices.z], position + t * step);
 		for(int i = 0;i < 3;i ++){
-			if(std::abs(edge_bary[i]) < 0.000001f){
+			if(std::abs(edge_bary[i]) < 0.001f){
 				edge_bary[i] = 0.f;
 			}
 		}
 		glm::uvec3 indices = start.indices;
 		glm::vec3 weights = edge_bary;
 		if(weights.z != 0.f){
-			printf("z is not zero\n");
-			printf("%s\n", glm::to_string(weights).c_str());
-			printf("%f\n", weights.x);
 			if(weights.x == 0.f){
-				printf("x is zero\n");
 				int tempIndex = indices.z;
 				indices.z = indices.x;
 				indices.x = tempIndex;
@@ -191,29 +190,17 @@ void WalkMesh::walk_in_triangle(WalkPoint const &start, glm::vec3 const &step, W
 				weights.z = 0.f;
 			}
 			else if(weights.y == 0.f){
-				printf("x is zero\n");
 				int tempIndex = indices.z;
 				indices.z = indices.y;
 				indices.y = tempIndex;
 
 				weights.y = weights.z;
 				weights.z = 0.f;
-			}else{
-				printf("nothing found?\n");
 			}
 		}
 		end = WalkPoint(indices, weights);
 		time = t;
 	}
-
-	//if no edge is crossed, event will just be taking the whole step:
-
-	//figure out which edge (if any) is crossed first.
-	// set time and end appropriately.
-	//TODO
-
-	//Remember: our convention is that when a WalkPoint is on an edge,
-	// then wp.weights.z == 0.0f (so will likely need to re-order the indices)
 }
 
 bool WalkMesh::cross_edge(WalkPoint const &start, WalkPoint *end_, glm::quat *rotation_) const {
@@ -223,20 +210,44 @@ bool WalkMesh::cross_edge(WalkPoint const &start, WalkPoint *end_, glm::quat *ro
 	assert(rotation_);
 	auto &rotation = *rotation_;
 
+	printf("%s\n", glm::to_string(start.weights).c_str());
 	assert(start.weights.z == 0.0f); //*must* be on an edge.
 	glm::uvec2 edge = glm::uvec2(start.indices);
 
+	auto otherVertexIt = next_vertex.find(glm::uvec2(edge.y, edge.x));
 	//check if 'edge' is a non-boundary edge:
-	if (edge.x == edge.y /* <-- TODO: use a real check, this is just here so code compiles */) {
+	if (otherVertexIt != next_vertex.end()) {
 		//it is!
 
 		//make 'end' represent the same (world) point, but on triangle (edge.y, edge.x, [other point]):
 		//TODO
+		glm::vec3 world_point = to_world_point(start);
+		rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+		end = start;
+
+		uint32_t otherVertex = otherVertexIt->second;
+
+		glm::vec3 new_weights = barycentric_weights(vertices[edge.y], vertices[edge.x], vertices[otherVertex], world_point);
+
+		end = WalkPoint(glm::uvec3(edge.y, edge.x, otherVertex), new_weights);
+
+		glm::vec3 vecA = vertices[start.indices.z] - vertices[edge.x];
+		glm::vec3 vecB = vertices[edge.y] - vertices[edge.x];
+		glm::vec3 vecC = vertices[otherVertex] - vertices[edge.x];
+		glm::vec3 norm1 = glm::cross(glm::normalize(vecA), glm::normalize(vecB));
+		glm::vec3 norm2 = glm::cross(glm::normalize(vecB), glm::normalize(vecC));
+
 
 		//make 'rotation' the rotation that takes (start.indices)'s normal to (end.indices)'s normal:
 		//TODO
-
+		glm::vec3 cross = glm::cross(norm2, norm1);
+		if(glm::length(cross) > 0){
+			rotation = glm::rotate(glm::asin(glm::length(cross)), cross);
+		}else{
+			rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+		}
 		return true;
+
 	} else {
 		end = start;
 		rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
