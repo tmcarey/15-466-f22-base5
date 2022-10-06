@@ -6,7 +6,9 @@
 #include "Mesh.hpp"
 #include "Load.hpp"
 #include "gl_errors.hpp"
+#include <glm/gtx/string_cast.hpp>
 #include "data_path.hpp"
+#include "glm/gtx/dual_quaternion.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/quaternion.hpp>
@@ -45,6 +47,16 @@ Load< WalkMeshes > phonebank_walkmeshes(LoadTagDefault, []() -> WalkMeshes const
 });
 
 PlayMode::PlayMode() : scene(*phonebank_scene) {
+
+	for (auto &transform : scene.transforms) {
+		if(transform.name.find("Ghost") != std::string::npos){
+			Ghost *ghost = new Ghost();
+			ghost->transform = &transform;
+			ghost->isFound = false;
+			ghosts.push_back(ghost);
+			ghost->startPosition = transform.position;
+		}
+	}
 	//create a player transform:
 	scene.transforms.emplace_back();
 	player.transform = &scene.transforms.back();
@@ -212,6 +224,32 @@ void PlayMode::update(float elapsed) {
 			player.transform->rotation = glm::normalize(adjust * player.transform->rotation);
 		}
 
+		totalTime += elapsed;
+		glm::vec3 lookDir =  player.camera->transform->make_local_to_world() * glm::vec4(0, 0.0f, 1.0f, 0.0f);
+
+		int i = 0;
+		for(auto ghostit = ghosts.begin(); ghostit < ghosts.end(); ghostit++){
+			Ghost* ghost = *ghostit;
+			if(!ghost->isFound){
+				ghost->transform->position = ghost->startPosition + glm::vec3(0, 0, glm::sin(totalTime));
+
+				glm::vec3 worldCameraPosition = (player.camera->transform->make_local_to_world() * glm::vec4(0.0f, 0, 0, 1.0f));
+				glm::vec3 worldGhostPosition = (ghost->transform->make_local_to_world() * glm::vec4(0.0f, 0, 0, 1.0f));
+				glm::vec3 fromCamera = glm::normalize(worldGhostPosition - worldCameraPosition);
+				glm::vec3 fromCameraReal = (worldGhostPosition - worldCameraPosition);
+
+				float angle = glm::acos(glm::dot(fromCamera, lookDir));
+				if(angle > 2.5f && glm::length(fromCameraReal) < 15.0f){
+					ghost->isFound = true;
+					totalFound++;
+				}
+
+			}else if(ghost->transform->position.z > -10.0f){
+				ghost->transform->position-= glm::vec3(0, 0, elapsed);
+			}
+			i++;
+		}
+
 		/*
 		glm::mat4x3 frame = camera->transform->make_local_to_parent();
 		glm::vec3 right = frame[0];
@@ -234,6 +272,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	player.camera->aspect = float(drawable_size.x) / float(drawable_size.y);
 
 	glm::vec3 fog_color(0.0f, 0.0f, 0.0f);
+	glm::vec3 flashlight_color(1.0f, 1.0f, 1.0f);
 	//set up light type and position for lit_color_texture_program:
 	// TODO: consider using the Light(s) in the scene to do this
 	glUseProgram(lit_color_texture_program->program);
@@ -241,6 +280,7 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 	glUniform3fv(lit_color_texture_program->LIGHT_DIRECTION_vec3, 1, glm::value_ptr(glm::vec3(0.0f, 0.0f,-1.0f)));
 	glUniform3fv(lit_color_texture_program->LIGHT_ENERGY_vec3, 1, glm::value_ptr(glm::vec3(0.5f, 0.5f, 0.5f)));
 	glUniform4fv(lit_color_texture_program->FOG_COLOR_vec4, 1, glm::value_ptr(fog_color));
+	glUniform4fv(lit_color_texture_program->FLASHLIGHT_COLOR_vec4, 1, glm::value_ptr(flashlight_color));
 	glUseProgram(0);
 
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -282,6 +322,10 @@ void PlayMode::draw(glm::uvec2 const &drawable_size) {
 		float ofs = 2.0f / drawable_size.y;
 		lines.draw_text("Mouse motion looks; WASD moves; escape ungrabs mouse",
 			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + + 0.1f * H + ofs, 0.0),
+			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		lines.draw_text(std::to_string(totalFound) + "/" + std::to_string(ghosts.size()) + " Ghosts Found",
+			glm::vec3(-aspect + 0.1f * H + ofs, -1.0 + 0.12f + 0.1f * H + ofs, 0.0),
 			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
 			glm::u8vec4(0xff, 0xff, 0xff, 0x00));
 	}

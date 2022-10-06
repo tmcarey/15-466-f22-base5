@@ -30,6 +30,7 @@ struct LitColorTextureProgram {
 	GLuint LIGHT_ENERGY_vec3 = -1U;
 	GLuint LIGHT_CUTOFF_float = -1U;
 	GLuint FOG_COLOR_vec4 = -1U;
+	GLuint FLASHLIGHT_COLOR_vec4 = -1U;
 
 	
 	//Textures:

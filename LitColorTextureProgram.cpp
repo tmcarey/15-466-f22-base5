@@ -83,6 +83,7 @@ LitColorTextureProgram::LitColorTextureProgram() {
 		"uniform float LIGHT_CUTOFF;\n"
 		"uniform vec3 CAMERA_LOCATION;\n"
 		"uniform vec4 FOG_COLOR;\n"
+		"uniform vec4 FLASHLIGHT_COLOR;\n"
 		"in vec3 position;\n"
 		"in vec3 viewPosition;\n"
 		"in vec3 normal;\n"
@@ -112,8 +113,15 @@ LitColorTextureProgram::LitColorTextureProgram() {
 		"		e = max(0.0, dot(n,-LIGHT_DIRECTION)) * LIGHT_ENERGY;\n"
 		"	}\n"
 		"	vec4 albedo = texture(TEX, texCoord) * color;\n"
-		"   vec4 nonFogColor = vec4(e*albedo.rgb, albedo.a);\n"
 		"   float distance = length(viewPosition);\n"
+		"   vec3 spotlightDir = vec3(0.0, 0.0, -1.0);\n"
+		"   float spotlight = dot(normalize(viewPosition), spotlightDir);"
+		"   spotlight = max(0.0, min(1.0f, spotlight)); "
+		"   if(spotlight < 0.9){"
+		"   	spotlight = 0.0;"
+		"   }"
+		"   spotlight *= (1.0f / length(viewPosition));"
+		"   vec4 nonFogColor = vec4(e*albedo.rgb + spotlight * FLASHLIGHT_COLOR.rgb, albedo.a);\n"
 		"	fragColor = mix(nonFogColor, FOG_COLOR, min(1.0, (distance * distance) / 2000.0f));\n"
 		"}\n"
 	);
@@ -139,6 +147,7 @@ LitColorTextureProgram::LitColorTextureProgram() {
 
 	OBJECT_TO_VIEW_mat4x3 = glGetUniformLocation(program, "OBJECT_TO_VIEW");
 	FOG_COLOR_vec4 = glGetUniformLocation(program, "FOG_COLOR");
+	FLASHLIGHT_COLOR_vec4 = glGetUniformLocation(program, "FLASHLIGHT_COLOR");
 
 	GLuint TEX_sampler2D = glGetUniformLocation(program, "TEX");
 

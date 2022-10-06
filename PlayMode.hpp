@@ -7,6 +7,7 @@
 
 #include <vector>
 #include <deque>
+#include "Ghost.hpp"
 
 struct PlayMode : Mode {
 	PlayMode();
@@ -27,6 +28,10 @@ struct PlayMode : Mode {
 
 	//local copy of the game scene (so code can change it during gameplay):
 	Scene scene;
+
+	std::vector<Ghost*> ghosts;
+	float totalTime;
+	int totalFound = 0;
 
 	//player info:
 	struct Player {
