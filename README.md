@@ -1,8 +1,8 @@
-# (TODO: your game's title)
+# Graveyard Shift
 
-Author: (TODO: your name)
+Author: Thomas Carey
 
-Design: (TODO: In two sentences or fewer, describe what is new and interesting about your game.)
+Design: Walk around in a dark and spooky graveyard to find ghosts...
 
 Screen Shot:
 
@@ -10,9 +10,7 @@ Screen Shot:
 
 How To Play:
 
-(TODO: describe the controls and (if needed) goals/strategy.)
-
-Sources: (TODO: list a source URL for any assets you did not create yourself. Make sure you have a license for the asset.)
+WASD and shine your flashlight on ghosts.
 
 This game was built with [NEST](NEST.md).
 
